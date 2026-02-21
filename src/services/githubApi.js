@@ -190,3 +190,21 @@ export const deleteRepository = async (token, username, repoName) => {
         throw error;
     }
 };
+
+export const fetchReadmeContent = async (token, username, repoName) => {
+    if (!token) return null;
+    try {
+        const response = await fetch(`https://api.github.com/repos/${username}/${repoName}/readme`, {
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3.raw' // Get raw content directly
+            }
+        });
+
+        if (!response.ok) return null;
+        return await response.text();
+    } catch (error) {
+        console.error('README Fetch Error:', error);
+        return null;
+    }
+};

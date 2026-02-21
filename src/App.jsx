@@ -26,7 +26,7 @@ import {
   Send
 } from 'lucide-react';
 
-import { fetchUserRepos, fetchFullRepoTree, updateRepoReadme, updateUserProfile, createNewRepository, deleteRepository } from './services/githubApi';
+import { fetchUserRepos, fetchFullRepoTree, updateRepoReadme, updateUserProfile, createNewRepository, deleteRepository, fetchReadmeContent } from './services/githubApi';
 import { generateNarrative, buildStorytellerPrompt, buildSocialPrompt, generateChatResponse } from './services/groqClient';
 
 const App = () => {
@@ -47,6 +47,7 @@ const App = () => {
   const [chatInput, setChatInput] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [customInstruction, setCustomInstruction] = useState('');
+  const [pendingAction, setPendingAction] = useState(null);
 
   // Auto-clear logic when repository changes
   useEffect(() => {
@@ -91,9 +92,10 @@ const App = () => {
 
     const username = githubUrl.split('/').pop();
     const tree = await fetchFullRepoTree(ghToken, username, selectedRepo.name);
+    const readme = await fetchReadmeContent(ghToken, username, selectedRepo.name);
     setSelectedRepoTree(tree || []);
 
-    const prompt = buildStorytellerPrompt(selectedRepo, tree || [], customInstruction);
+    const prompt = buildStorytellerPrompt(selectedRepo, tree || [], customInstruction, readme);
     const result = await generateNarrative(apiKey, prompt);
     setGeneratedContent(result);
     setIsGenerating(false);
@@ -132,7 +134,9 @@ const App = () => {
     if (!selectedRepo) return;
     setIsGenerating(true);
 
-    const prompt = buildSocialPrompt(selectedRepo, type, customInstruction);
+    const username = githubUrl.split('/').pop();
+    const readme = await fetchReadmeContent(ghToken, username, selectedRepo.name);
+    const prompt = buildSocialPrompt(selectedRepo, type, customInstruction, readme);
     const result = await generateNarrative(apiKey, prompt);
 
     setSocialPosts(prev => ({ ...prev, [type]: result }));
@@ -148,78 +152,64 @@ const App = () => {
 
     const response = await generateChatResponse(apiKey, newMessages, { repos });
 
-    // ACTION PARSING LOGIC
-    if (response.includes('ACTION:UPDATE_BIO')) {
-      const bio = response.match(/ACTION:UPDATE_BIO "(.*)"/)?.[1];
-      if (bio) {
-        try {
-          await updateUserProfile(ghToken, { bio });
-          alert('Bio updated successfully on GitHub! ✅');
-        } catch (e) { console.error(e); }
-      }
-    }
-
-    if (response.includes('ACTION:COMMIT_README')) {
-      const match = response.match(/ACTION:COMMIT_README "(.*?)" "(.*?)"/s);
-      if (match) {
-        const [_, repoName, content] = match;
-        const username = githubUrl.split('/').pop();
-        try {
-          await updateRepoReadme(ghToken, username, repoName, content);
-          alert(`README committed to ${repoName}! 🚀`);
-        } catch (e) { console.error(e); }
-      }
-    }
-
-    if (response.includes('ACTION:UPDATE_PROFILE')) {
-      const match = response.match(/ACTION:UPDATE_PROFILE ({.*?})/);
-      if (match) {
-        try {
-          const profileData = JSON.parse(match[1]);
-          await updateUserProfile(ghToken, profileData);
-          alert('Profile fields updated successfully! 🛠️');
-        } catch (e) { console.error(e); }
-      }
-    }
-
-    if (response.includes('ACTION:CREATE_REPO')) {
-      const match = response.match(/ACTION:CREATE_REPO ({.*?})/);
-      if (match) {
-        try {
-          const repoData = JSON.parse(match[1]);
-          await createNewRepository(ghToken, repoData);
-          alert(`Repository "${repoData.name}" created successfully! 🚀`);
-          handleScan(); // Refresh repo list
-        } catch (e) { console.error(e); }
-      }
-    }
-
-    if (response.includes('ACTION:UPDATE_AVATAR')) {
-      const avatar = response.match(/ACTION:UPDATE_AVATAR "(.*)"/)?.[1];
-      if (avatar) {
-        setAvatarUrl(avatar);
-        alert('GMA Profile Picture synced! 🖼️');
-      }
-    }
-
-    if (response.includes('ACTION:DELETE_REPO')) {
-      const repoName = response.match(/ACTION:DELETE_REPO "(.*)"/)?.[1];
-      if (repoName) {
-        if (confirm(`Are you sure you want to PERMANENTLY delete the repository "${repoName}"? This action cannot be undone.`)) {
-          const username = githubUrl.split('/').pop();
-          try {
-            await deleteRepository(ghToken, username, repoName);
-            alert(`Repository "${repoName}" has been deleted. 🛡️`);
-            handleScan(); // Refresh repo list
-          } catch (e) {
-            alert(`Delete failed: ${e.message}`);
-          }
-        }
+    // Detect action but DO NOT execute yet
+    if (response.includes('ACTION:')) {
+      const actionMatch = response.match(/ACTION:([A-Z_]+ .*)/s);
+      if (actionMatch) {
+        setPendingAction(actionMatch[0]);
       }
     }
 
     setChatMessages([...newMessages, { role: 'assistant', content: response.split('ACTION:')[0].trim() }]);
     setIsGenerating(false);
+  };
+
+  const executeAction = async (actionString) => {
+    setIsGenerating(true);
+    try {
+      if (actionString.includes('UPDATE_BIO')) {
+        const bio = actionString.match(/UPDATE_BIO "(.*)"/)?.[1];
+        await updateUserProfile(ghToken, { bio });
+        alert('Bio updated successfully! ✅');
+      } else if (actionString.includes('COMMIT_README')) {
+        const match = actionString.match(/COMMIT_README "(.*?)" "(.*?)"/s);
+        if (match) {
+          const [_, repoName, content] = match;
+          const username = githubUrl.split('/').pop();
+          await updateRepoReadme(ghToken, username, repoName, content);
+          alert(`README committed to ${repoName}! 🚀`);
+        }
+      } else if (actionString.includes('UPDATE_PROFILE')) {
+        const match = actionString.match(/UPDATE_PROFILE ({.*?})/);
+        if (match) {
+          const profileData = JSON.parse(match[1]);
+          await updateUserProfile(ghToken, profileData);
+          alert('Profile updated! 🛠️');
+        }
+      } else if (actionString.includes('CREATE_REPO')) {
+        const match = actionString.match(/CREATE_REPO ({.*?})/);
+        if (match) {
+          const repoData = JSON.parse(match[1]);
+          await createNewRepository(ghToken, repoData);
+          alert(`Repository "${repoData.name}" created! 🚀`);
+          handleScan();
+        }
+      } else if (actionString.includes('DELETE_REPO')) {
+        const repoName = actionString.match(/DELETE_REPO "(.*)"/)?.[1];
+        const username = githubUrl.split('/').pop();
+        await deleteRepository(ghToken, username, repoName);
+        alert(`Repository "${repoName}" deleted. 🛡️`);
+        handleScan();
+      } else if (actionString.includes('UPDATE_AVATAR')) {
+        const avatar = actionString.match(/UPDATE_AVATAR "(.*)"/)?.[1];
+        setAvatarUrl(avatar);
+      }
+    } catch (e) {
+      alert(`Action failed: ${e.message}`);
+    } finally {
+      setPendingAction(null);
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -655,6 +645,23 @@ const App = () => {
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}>
                 <div className={`p-5 rounded-3xl max-w-[85%] text-[13px] leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none font-medium'}`}>
                   {msg.content}
+
+                  {msg.role === 'assistant' && pendingAction && i === chatMessages.length - 1 && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex gap-3">
+                      <button
+                        onClick={() => executeAction(pendingAction)}
+                        className="flex-1 bg-emerald-600 text-white py-2 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-colors"
+                      >
+                        Confirm Action
+                      </button>
+                      <button
+                        onClick={() => setPendingAction(null)}
+                        className="px-4 bg-slate-100 text-slate-400 py-2 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

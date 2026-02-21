@@ -43,50 +43,50 @@ export const generateNarrative = async (apiKey, prompt) => {
     }
 };
 
-export const buildStorytellerPrompt = (repo, tree, userInstructions = "") => {
+export const buildStorytellerPrompt = (repo, tree, userInstructions = "", readmeContent = "") => {
     const fileSummary = tree.slice(0, 30).map(f => f.path).join(', ');
 
     return `
     PROJECT: ${repo.name}
-    DESCRIPTION: ${repo.description}
-    TECH STACK: ${repo.language}
-    FILES: ${fileSummary}
+    DESCRIPTION (from GitHub): ${repo.description}
+    README CONTENT (Actual project details): 
+    ${readmeContent ? readmeContent.slice(0, 3000) : "No README found. Rely on file tree."}
+    
+    FILE TREE SUMMARY: ${fileSummary}
     
     USER CUSTOM INSTRUCTIONS: ${userInstructions || "No specific instructions. Use your elite testing persona."}
 
-    TASK: Generate a "Quality Engineering Narrative" for this repository.
-    SCHEMA:
-    1. 🛡️ QA ARCHITECTURE: How does this project ensure quality?
-    2. ⚙️ AUTOMATION STACK: What tools and frameworks are being leveraged (referencing files)?
-    3. 🧠 INDUSTRIAL IMPACT: Why this project is critical for a professional testing portfolio.
-    4. ⚡ ELITE FEATURES: 3 bullet points with distinct symbols.
-
-    CRITICAL: Focus 100% on Software Testing and Quality Assurance. Avoid generic development terms.
+    TASK: Generate a "High-Impact Quality Engineering Narrative".
+    CRITICAL INSTRUCTION:
+    - DISREGARD generic tech stacks. Focus on WHAT this tool actually does for Testing/QA (read the README carefully).
+    - If the README describes specific testing features (Regenerative, Logic-based, etc.), spotlight them.
+    - SCHEMA:
+      1. 🛡️ CORE MISSION: What problem does this project solve for QA?
+      2. ⚙️ TECHNICAL ARCHITECTURE: Based on the README and Files.
+      3. 🧠 PROFESSIONAL IMPACT: Why this adds value to a Quality Engineer's portfolio.
     `;
 };
 
-export const buildSocialPrompt = (repo, type, userInstructions = "") => {
+export const buildSocialPrompt = (repo, type, userInstructions = "", readmeContent = "") => {
     const typeConstraints = {
-        engine: "Focus on the CORE ENGINE and infrastructure. Use ⚙️ and 🛠️ symbols. Highlight how it powers the automation.",
-        logic: "Focus on the TECHNICAL LOGIC and test-case architecture. Use 🧠 and 🧪 symbols. Highlight the smart generation aspects.",
-        release: "Focus on the QUALITY BENCHMARK and final release impact. Use 🏆 and ⚡ symbols. High-impact launch energy."
+        engine: "Focus on the CORE ENGINE and infrastructure. Use ⚙️ and 🛠️ symbols.",
+        logic: "Focus on the TECHNICAL LOGIC and test-case architecture. Use 🧠 and 🧪 symbols.",
+        release: "Focus on the QUALITY BENCHMARK and final release impact. Use 🏆 and ⚡ symbols."
     };
 
     return `
-    PROJECT NAME: ${repo.name} (CRITICAL: You must use the literal project name "${repo.name}" in the post)
-    DESCRIPTION: ${repo.description}
-    TECH STACK: ${repo.language}
+    PROJECT NAME: ${repo.name}
+    README SUMMARY/CONTENT: ${readmeContent ? readmeContent.slice(0, 2000) : repo.description}
     POST TYPE: ${type}
     SPECIFIC CONSTRAINT: ${typeConstraints[type] || ""}
     
     USER CUSTOM INSTRUCTIONS: ${userInstructions || "Make it professional for a QA leader."}
 
-    TASK: Write a UNIQUE, energetic LinkedIn post about "${repo.name}".
+    TASK: Write a UNIQUE LinkedIn spotlight about "${repo.name}".
     GUIDELINES:
-    - You must start with a massive "Hook" specifically about ${repo.name}.
-    - DO NOT generate generic development fluff.
-    - EVERY SECTION must have visual symbols.
-    - Focus 100% on Quality Engineering/Automation impact.
+    - IDENTIFY THE PURPOSE: Do not just list files. Tell the story of what ${repo.name} achieves.
+    - Start with a massive technical "Hook".
+    - Use industrial symbols.
     `;
 };
 
