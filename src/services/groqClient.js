@@ -111,15 +111,18 @@ export const generateChatResponse = async (apiKey, messages, context = {}) => {
             
             Tone: High-impact, technical, and symbol-rich (🛡️, 🧪, ⚙️).
             
-            SKILLS (Trigger these by starting your line with the exact keyword):
+            SKILLS:
             - Update bio: ACTION:UPDATE_BIO "new text"
             - Create README: ACTION:COMMIT_README "repo" "[Markdown Content]"
-            - Update name/loc: ACTION:UPDATE_PROFILE {"name": "...", "location": "..."}
-            - Create Repository: ACTION:CREATE_REPO {"name": "repo_name", "description": "desc", "private": false}
+            - Update profile: ACTION:UPDATE_PROFILE {"name": "...", "location": "..."}
+            - Create Repository: ACTION:CREATE_REPO {"name": "repo_name", "description": "desc"}
             - Delete Repository: ACTION:DELETE_REPO "repo_name"
             - Sync Avatar: ACTION:UPDATE_AVATAR "image_url"
 
-            When a user asks to perform these, confirm first, then provide the ACTION line at the end.`
+            PROTOCOL FOR ACTIONS:
+            1. If an action is requested, confirm the details first.
+            2. For DELETION: Explicitly state: "⚙️ Confirming repository deletion details: Repository Name: [Name]. Are you sure? This action is permanent."
+            3. Then, provide the ACTION: line at the very end of your response.`
                     },
                     ...messages
                 ],

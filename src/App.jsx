@@ -166,46 +166,67 @@ const App = () => {
 
   const executeAction = async (actionString) => {
     setIsGenerating(true);
+    let successMsg = "";
+    let proceedingMsg = "";
+
+    // Determine action-specific messages
+    if (actionString.includes('DELETE_REPO')) {
+      const repoName = actionString.match(/DELETE_REPO "(.*)"/)?.[1];
+      proceedingMsg = `🛡️ Repository "${repoName}" deletion confirmed. Proceeding with deletion...`;
+      successMsg = `✅ Successfully deleted "${repoName}". I am now refreshing your repository pipeline. Status: Updated.`;
+    } else if (actionString.includes('UPDATE_BIO')) {
+      proceedingMsg = "⚙️ Proceeding to update your profile bio...";
+      successMsg = "✅ Bio updated successfully on GitHub!";
+    } else if (actionString.includes('CREATE_REPO')) {
+      const repoName = actionString.match(/CREATE_REPO ({.*?})/)?.[1] ? JSON.parse(actionString.match(/CREATE_REPO ({.*?})/)[1]).name : "new repository";
+      proceedingMsg = `🚀 Initializing creation of "${repoName}"...`;
+      successMsg = `✅ Repository "${repoName}" created! Refreshing list.`;
+    } else {
+      proceedingMsg = "⚙️ Assistant is executing the requested action...";
+      successMsg = "✅ Action completed successfully!";
+    }
+
+    // Add proceeding message to chat
+    setChatMessages(prev => [...prev, { role: 'assistant', content: proceedingMsg }]);
+
     try {
       if (actionString.includes('UPDATE_BIO')) {
         const bio = actionString.match(/UPDATE_BIO "(.*)"/)?.[1];
         await updateUserProfile(ghToken, { bio });
-        alert('Bio updated successfully! ✅');
       } else if (actionString.includes('COMMIT_README')) {
         const match = actionString.match(/COMMIT_README "(.*?)" "(.*?)"/s);
         if (match) {
           const [_, repoName, content] = match;
           const username = githubUrl.split('/').pop();
           await updateRepoReadme(ghToken, username, repoName, content);
-          alert(`README committed to ${repoName}! 🚀`);
         }
       } else if (actionString.includes('UPDATE_PROFILE')) {
         const match = actionString.match(/UPDATE_PROFILE ({.*?})/);
         if (match) {
           const profileData = JSON.parse(match[1]);
           await updateUserProfile(ghToken, profileData);
-          alert('Profile updated! 🛠️');
         }
       } else if (actionString.includes('CREATE_REPO')) {
         const match = actionString.match(/CREATE_REPO ({.*?})/);
         if (match) {
           const repoData = JSON.parse(match[1]);
           await createNewRepository(ghToken, repoData);
-          alert(`Repository "${repoData.name}" created! 🚀`);
           handleScan();
         }
       } else if (actionString.includes('DELETE_REPO')) {
         const repoName = actionString.match(/DELETE_REPO "(.*)"/)?.[1];
         const username = githubUrl.split('/').pop();
         await deleteRepository(ghToken, username, repoName);
-        alert(`Repository "${repoName}" deleted. 🛡️`);
         handleScan();
       } else if (actionString.includes('UPDATE_AVATAR')) {
         const avatar = actionString.match(/UPDATE_AVATAR "(.*)"/)?.[1];
         setAvatarUrl(avatar);
       }
+
+      // Add success message to chat
+      setChatMessages(prev => [...prev, { role: 'assistant', content: successMsg }]);
     } catch (e) {
-      alert(`Action failed: ${e.message}`);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `❌ Action failed: ${e.message}` }]);
     } finally {
       setPendingAction(null);
       setIsGenerating(false);
