@@ -207,21 +207,22 @@ export const fetchReadmeContent = async (token, username, repoName) => {
         console.error('README Fetch Error:', error);
         return null;
     }
+};
 
-    export const fetchUserProfileData = async (token) => {
-        if (!token) return null;
-        try {
-            const response = await fetch('https://api.github.com/user', {
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
+export const fetchUserProfileData = async (token) => {
+    if (!token) return null;
+    try {
+        const response = await fetch('https://api.github.com/user', {
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
 
-            if (!response.ok) throw new Error('Failed to fetch profile data');
-            return await response.json();
-        } catch (error) {
-            console.error('Profile Fetch Error:', error);
-            return null;
-        }
-    };
+        if (!response.ok) throw new Error('Failed to fetch profile data');
+        return await response.json();
+    } catch (error) {
+        console.error('Profile Fetch Error:', error);
+        return null;
+    }
+};
