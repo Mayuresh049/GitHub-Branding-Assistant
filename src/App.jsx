@@ -49,12 +49,21 @@ const App = () => {
   const [customInstruction, setCustomInstruction] = useState('');
   const [pendingAction, setPendingAction] = useState(null);
 
-  // Auto-clear logic when repository changes
+  // Auto-clear & Auto-Scan logic when repository changes
   useEffect(() => {
     setGeneratedContent('');
     setSelectedRepoTree([]);
     setSocialPosts({});
-  }, [selectedRepo]);
+
+    if (selectedRepo && ghToken) {
+      const scanTree = async () => {
+        const username = githubUrl.split('/').pop();
+        const tree = await fetchFullRepoTree(ghToken, username, selectedRepo.name);
+        setSelectedRepoTree(tree || []);
+      };
+      scanTree();
+    }
+  }, [selectedRepo, ghToken, githubUrl]);
 
   // Real Repos from State
   const [repos, setRepos] = useState(() => {
@@ -120,7 +129,8 @@ const App = () => {
       score += 15;
       flags.push("Low repository file depth");
     } else {
-      flags.push("No file analysis performed");
+      // If tree is empty, we don't subtract points yet, but we inform the UI
+      return { score: null, grade: 'Scanning', flags: ["Initial file analysis in progress..."], color: 'text-slate-400', bg: 'bg-slate-100' };
     }
 
     let grade = 'F';
