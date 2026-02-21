@@ -26,16 +26,18 @@ import {
   Send
 } from 'lucide-react';
 
-import { fetchUserRepos, fetchFullRepoTree, updateRepoReadme, updateUserProfile, createNewRepository, deleteRepository, fetchReadmeContent } from './services/githubApi';
-import { generateNarrative, buildStorytellerPrompt, buildSocialPrompt, generateChatResponse } from './services/groqClient';
+import { fetchUserRepos, fetchFullRepoTree, updateRepoReadme, updateUserProfile, createNewRepository, deleteRepository, fetchReadmeContent, fetchUserProfileData } from './services/githubApi';
+import { generateNarrative, buildStorytellerPrompt, buildSocialPrompt, generateChatResponse } from './services/llmClient';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('portfolio');
   const [isLoading, setIsLoading] = useState(false);
   const [repoStatus, setRepoStatus] = useState('idle');
   const [githubUrl, setGithubUrl] = useState('https://github.com/Mayuresh049');
-  const [apiKey, setApiKey] = useState(localStorage.getItem('groq_api_key') || '');
+  const [llmApiKey, setLlmApiKey] = useState(localStorage.getItem('llm_api_key') || '');
+  const [llmProvider, setLlmProvider] = useState(localStorage.getItem('llm_provider') || 'groq');
   const [ghToken, setGhToken] = useState(localStorage.getItem('gh_token') || '');
+  const [profileData, setProfileData] = useState(null);
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [selectedRepoTree, setSelectedRepoTree] = useState([]);
   const [generatedContent, setGeneratedContent] = useState('');
@@ -144,6 +146,38 @@ const App = () => {
     return { score, grade, flags, color, bg };
   };
 
+  const calculateProfileScore = (data) => {
+    if (!data) return { score: 0, grade: 'F', flags: ["No data fetched"] };
+    let score = 0;
+    const flags = [];
+
+    if (data.bio && data.bio.length > 50) score += 40;
+    else flags.push("Bio is missing or too short (Target: 50+ chars)");
+
+    if (data.name && data.name.length > 2) score += 20;
+    else flags.push("Display name is missing");
+
+    if (data.location) score += 20;
+    else flags.push("Location is not specified");
+
+    if (data.avatar_url && !data.avatar_url.includes('default')) score += 20;
+    else flags.push("Professional avatar recommended");
+
+    let grade = 'F';
+    let color = 'text-rose-500';
+    if (score >= 90) grade = 'A';
+    else if (score >= 70) grade = 'B';
+    else if (score >= 40) grade = 'C';
+
+    return { score, grade, flags, color };
+  };
+
+  useEffect(() => {
+    if (ghToken) {
+      fetchUserProfileData(ghToken).then(setProfileData);
+    }
+  }, [ghToken]);
+
   const handleGenerateStory = async () => {
     if (!selectedRepo) return;
     setIsGenerating(true);
@@ -154,7 +188,7 @@ const App = () => {
     setSelectedRepoTree(tree || []);
 
     const prompt = buildStorytellerPrompt(selectedRepo, tree || [], customInstruction, readme);
-    const result = await generateNarrative(apiKey, prompt);
+    const result = await generateNarrative(llmApiKey, prompt, llmProvider);
     setGeneratedContent(result);
     setIsGenerating(false);
   };
@@ -195,7 +229,7 @@ const App = () => {
     const username = githubUrl.split('/').pop();
     const readme = await fetchReadmeContent(ghToken, username, selectedRepo.name);
     const prompt = buildSocialPrompt(selectedRepo, type, customInstruction, readme);
-    const result = await generateNarrative(apiKey, prompt);
+    const result = await generateNarrative(llmApiKey, prompt, llmProvider);
 
     setSocialPosts(prev => ({ ...prev, [type]: result }));
     setIsGenerating(false);
@@ -208,7 +242,7 @@ const App = () => {
     setChatInput('');
     setIsGenerating(true);
 
-    const response = await generateChatResponse(apiKey, newMessages, { repos });
+    const response = await generateChatResponse(llmApiKey, newMessages, llmProvider);
 
     // Detect action but DO NOT execute yet
     if (response.includes('ACTION:')) {
@@ -400,6 +434,49 @@ const App = () => {
                   <h2 className="text-4xl font-google font-bold tracking-tight italic">Quality Engineering <span className="text-gradient">Intelligence</span></h2>
                   <p className="text-slate-500 text-lg font-medium max-w-2xl mx-auto italic">Welcome Mayuresh! I've analyzed your automation repositories. Let's showcase your technical impact.</p>
                 </div>
+
+                {/* Profile Doctor Dashboard */}
+                {profileData && (
+                  <div className="bg-white border-2 border-slate-100 rounded-[2.5rem] p-10 shadow-sm flex flex-col md:flex-row items-center gap-10">
+                    <div className="relative">
+                      <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-xl">
+                        <img src={profileData.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                      </div>
+                      {(() => {
+                        const health = calculateProfileScore(profileData);
+                        return (
+                          <div className={`absolute -bottom-2 -right-2 w-10 h-10 rounded-full ${health.grade === 'A' ? 'bg-emerald-500' : 'bg-amber-500'} flex items-center justify-center text-white font-black text-xs border-4 border-white shadow-lg`}>
+                            {health.grade}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div className="flex-1 text-left space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-2xl font-google font-bold text-slate-900 leading-tight">{profileData.name || profileData.login}</h3>
+                          <p className="text-slate-500 text-sm font-medium italic">{profileData.location || "Global QA Strategy"}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Profile Health</span>
+                          <span className="text-2xl font-black text-slate-900 leading-none">{calculateProfileScore(profileData).score}%</span>
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col gap-3">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Assistant Diagnosis & Suggestions</span>
+                        <div className="flex flex-wrap gap-2">
+                          {calculateProfileScore(profileData).flags.length === 0 ? (
+                            <span className="text-emerald-600 text-[11px] font-bold">💎 This profile is optimized for Elite QE roles!</span>
+                          ) : (
+                            calculateProfileScore(profileData).flags.map((flag, i) => (
+                              <span key={i} className="bg-white px-3 py-1 rounded text-[10px] font-bold text-slate-600 border border-slate-200">🛠️ {flag}</span>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid md:grid-cols-2 gap-8">
                   <div className="p-10 rounded-[2.5rem] bg-slate-50 border border-slate-100 flex flex-col gap-6 group hover:border-blue-200 transition-all">
@@ -670,31 +747,34 @@ const App = () => {
 
                   <div className="space-y-3">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 flex items-center gap-2">
-                      <Lock className="w-3 h-3" /> GitHub Personal Access Token
+                      <Zap className="w-3 h-3" /> LLM Provider
                     </label>
-                    <input
-                      type="password"
-                      value={ghToken}
+                    <select
+                      value={llmProvider}
                       onChange={(e) => {
-                        setGhToken(e.target.value);
-                        localStorage.setItem('gh_token', e.target.value);
+                        setLlmProvider(e.target.value);
+                        localStorage.setItem('llm_provider', e.target.value);
                       }}
-                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-6 py-4 focus:ring-2 focus:ring-blue-500 transition-all text-sm font-mono"
-                      placeholder="ghp_..."
-                    />
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-6 py-4 text-sm font-bold"
+                    >
+                      <option value="groq">Groq (Llama 3.3)</option>
+                      <option value="gemini">Google Gemini (Flash 1.5)</option>
+                    </select>
                   </div>
 
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Groq AI API Key</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 flex items-center gap-2">
+                      <Lock className="w-3 h-3" /> Universal LLM API Key
+                    </label>
                     <input
                       type="password"
-                      value={apiKey}
+                      value={llmApiKey}
                       onChange={(e) => {
-                        setApiKey(e.target.value);
-                        localStorage.setItem('groq_api_key', e.target.value);
+                        setLlmApiKey(e.target.value);
+                        localStorage.setItem('llm_api_key', e.target.value);
                       }}
-                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-6 py-4 focus:ring-2 focus:ring-blue-500 transition-all text-sm font-mono"
-                      placeholder="gsk_..."
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-6 py-4 text-sm"
+                      placeholder="Paste your API key here..."
                     />
                   </div>
 
