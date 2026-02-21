@@ -166,3 +166,27 @@ export const createNewRepository = async (token, repoData) => {
         throw error;
     }
 };
+
+export const deleteRepository = async (token, username, repoName) => {
+    if (!token) throw new Error('GitHub Token missing');
+
+    try {
+        const response = await fetch(`https://api.github.com/repos/${username}/${repoName}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || 'Failed to delete repository');
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Delete Repo Error:', error);
+        throw error;
+    }
+};

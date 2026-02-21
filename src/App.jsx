@@ -26,7 +26,7 @@ import {
   Send
 } from 'lucide-react';
 
-import { fetchUserRepos, fetchFullRepoTree, updateRepoReadme, updateUserProfile, createNewRepository } from './services/githubApi';
+import { fetchUserRepos, fetchFullRepoTree, updateRepoReadme, updateUserProfile, createNewRepository, deleteRepository } from './services/githubApi';
 import { generateNarrative, buildStorytellerPrompt, buildSocialPrompt, generateChatResponse } from './services/groqClient';
 
 const App = () => {
@@ -199,6 +199,22 @@ const App = () => {
       if (avatar) {
         setAvatarUrl(avatar);
         alert('GMA Profile Picture synced! 🖼️');
+      }
+    }
+
+    if (response.includes('ACTION:DELETE_REPO')) {
+      const repoName = response.match(/ACTION:DELETE_REPO "(.*)"/)?.[1];
+      if (repoName) {
+        if (confirm(`Are you sure you want to PERMANENTLY delete the repository "${repoName}"? This action cannot be undone.`)) {
+          const username = githubUrl.split('/').pop();
+          try {
+            await deleteRepository(ghToken, username, repoName);
+            alert(`Repository "${repoName}" has been deleted. 🛡️`);
+            handleScan(); // Refresh repo list
+          } catch (e) {
+            alert(`Delete failed: ${e.message}`);
+          }
+        }
       }
     }
 
@@ -652,13 +668,17 @@ const App = () => {
           </div>
           <div className="p-6 bg-white border-t border-slate-100">
             <div className="flex gap-3">
-              <input
-                type="text"
+              <textarea
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Update my bio, add a readme..."
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm focus:ring-4 focus:ring-blue-100 transition-all outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder="Update my bio, add a readme, or delete a repo..."
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm focus:ring-4 focus:ring-blue-100 transition-all outline-none h-[56px] min-h-[56px] max-h-[150px] resize-none overflow-y-auto"
               />
               <button
                 onClick={handleSendMessage}

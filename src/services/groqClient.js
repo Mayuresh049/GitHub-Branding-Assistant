@@ -66,18 +66,27 @@ export const buildStorytellerPrompt = (repo, tree, userInstructions = "") => {
 };
 
 export const buildSocialPrompt = (repo, type, userInstructions = "") => {
-    return `
-    PROJECT: ${repo.name}
-    TECH: ${repo.language}
-    TYPE: ${type}
-    USER CUSTOM INSTRUCTIONS: ${userInstructions || "Make it viral and professional for a QA Lead."}
+    const typeConstraints = {
+        engine: "Focus on the CORE ENGINE and infrastructure. Use ⚙️ and 🛠️ symbols. Highlight how it powers the automation.",
+        logic: "Focus on the TECHNICAL LOGIC and test-case architecture. Use 🧠 and 🧪 symbols. Highlight the smart generation aspects.",
+        release: "Focus on the QUALITY BENCHMARK and final release impact. Use 🏆 and ⚡ symbols. High-impact launch energy."
+    };
 
-    TASK: Write an energetic LinkedIn post focusing on Automation & Testing Innovation.
-    FORMAT:
-    - ⚡ HOOK: Bold statement about the future of testing.
-    - 🟢 Feature List with symbols.
-    - 🚀 Impact summary.
-    - Call to action for the Testing community.
+    return `
+    PROJECT NAME: ${repo.name} (CRITICAL: You must use the literal project name "${repo.name}" in the post)
+    DESCRIPTION: ${repo.description}
+    TECH STACK: ${repo.language}
+    POST TYPE: ${type}
+    SPECIFIC CONSTRAINT: ${typeConstraints[type] || ""}
+    
+    USER CUSTOM INSTRUCTIONS: ${userInstructions || "Make it professional for a QA leader."}
+
+    TASK: Write a UNIQUE, energetic LinkedIn post about "${repo.name}".
+    GUIDELINES:
+    - You must start with a massive "Hook" specifically about ${repo.name}.
+    - DO NOT generate generic development fluff.
+    - EVERY SECTION must have visual symbols.
+    - Focus 100% on Quality Engineering/Automation impact.
     `;
 };
 
@@ -107,6 +116,7 @@ export const generateChatResponse = async (apiKey, messages, context = {}) => {
             - Create README: ACTION:COMMIT_README "repo" "[Markdown Content]"
             - Update name/loc: ACTION:UPDATE_PROFILE {"name": "...", "location": "..."}
             - Create Repository: ACTION:CREATE_REPO {"name": "repo_name", "description": "desc", "private": false}
+            - Delete Repository: ACTION:DELETE_REPO "repo_name"
             - Sync Avatar: ACTION:UPDATE_AVATAR "image_url"
 
             When a user asks to perform these, confirm first, then provide the ACTION line at the end.`
