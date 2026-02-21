@@ -714,9 +714,11 @@ const App = () => {
                   <button
                     onClick={() => {
                       localStorage.removeItem('gh_token');
-                      localStorage.removeItem('groq_api_key');
+                      localStorage.removeItem('llm_api_key');
+                      localStorage.removeItem('llm_provider');
                       setGhToken('');
-                      setApiKey('');
+                      setLlmApiKey('');
+                      setProfileData(null);
                       alert('Disconnected! All local credentials have been wiped. 🛡️');
                     }}
                     className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-100 transition-colors border border-rose-100"
@@ -726,6 +728,22 @@ const App = () => {
                 </div>
 
                 <div className="space-y-8">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1 flex items-center gap-2">
+                      <Lock className="w-3 h-3" /> GitHub Personal Access Token
+                    </label>
+                    <input
+                      type="password"
+                      value={ghToken}
+                      onChange={(e) => {
+                        setGhToken(e.target.value);
+                        localStorage.setItem('gh_token', e.target.value);
+                      }}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-6 py-4 text-sm"
+                      placeholder="ghp_xxxxxxxxxxxx"
+                    />
+                  </div>
+
                   <div className="space-y-3">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Profile Photo Sync</label>
                     <div className="flex gap-4">
