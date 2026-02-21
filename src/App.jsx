@@ -86,6 +86,54 @@ const App = () => {
     }, 1500);
   };
 
+  const calculateRepoScore = (repo, tree = []) => {
+    let score = 0;
+    const flags = [];
+
+    // 1. Description check (20 pts)
+    if (repo.description) {
+      score += 20;
+    } else {
+      flags.push("Missing project description");
+    }
+
+    // 2. README check (30 pts)
+    const hasReadme = tree.some(f => f.path.toLowerCase().includes('readme.md'));
+    if (hasReadme) {
+      score += 30;
+    } else {
+      flags.push("Missing README.md file");
+    }
+
+    // 3. Professional Naming (20 pts)
+    const isProfessionalName = /^[A-Z]/.test(repo.name) || repo.name.includes('-') || repo.name.includes('_');
+    if (isProfessionalName) {
+      score += 20;
+    } else {
+      flags.push("Generic or lowercase naming");
+    }
+
+    // 4. Content Depth (30 pts)
+    if (tree.length > 10) {
+      score += 30;
+    } else if (tree.length > 0) {
+      score += 15;
+      flags.push("Low repository file depth");
+    } else {
+      flags.push("No file analysis performed");
+    }
+
+    let grade = 'F';
+    let color = 'text-rose-500';
+    let bg = 'bg-rose-50';
+
+    if (score >= 90) { grade = 'A'; color = 'text-emerald-500'; bg = 'bg-emerald-50'; }
+    else if (score >= 75) { grade = 'B'; color = 'text-blue-500'; bg = 'bg-blue-50'; }
+    else if (score >= 50) { grade = 'C'; color = 'text-amber-500'; bg = 'bg-amber-50'; }
+
+    return { score, grade, flags, color, bg };
+  };
+
   const handleGenerateStory = async () => {
     if (!selectedRepo) return;
     setIsGenerating(true);
@@ -397,7 +445,20 @@ const App = () => {
                         <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center">
                           <Shield className="w-4 h-4 text-blue-600" />
                         </div>
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-slate-900">QE Story: {selectedRepo.name}</span>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-slate-900">QE Story: {selectedRepo.name}</span>
+                          {(() => {
+                            const health = calculateRepoScore(selectedRepo, selectedRepoTree);
+                            return (
+                              <div className={`mt-1 flex items-center gap-1.5`}>
+                                <div className={`px-1.5 py-0.5 rounded ${health.bg} ${health.color} text-[8px] font-black uppercase tracking-tighter border border-current/10`}>
+                                  Health: {health.grade}
+                                </div>
+                                <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">({health.score}/100)</span>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
                       <div className="flex gap-4">
                         <button
@@ -409,6 +470,27 @@ const App = () => {
                         </button>
                       </div>
                     </div>
+
+                    {/* Repo Diagnosis Display */}
+                    {(() => {
+                      const health = calculateRepoScore(selectedRepo, selectedRepoTree);
+                      if (health.flags.length === 0) return null;
+                      return (
+                        <div className="px-8 py-4 bg-amber-50/50 border-b border-amber-100 flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <Shield className="w-3 h-3 text-amber-600" />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600">Diagnosis: Technical Branding Flags</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {health.flags.map((flag, idx) => (
+                              <span key={idx} className="bg-white px-2 py-1 rounded text-[9px] font-medium text-amber-700 border border-amber-200">
+                                ⚠️ {flag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Manual Instruction Textarea */}
                     <div className="px-8 py-5 bg-slate-50/50 border-b border-slate-100">
@@ -535,11 +617,25 @@ const App = () => {
           ) : activeTab === 'settings' ? (
             <div className="flex-1 overflow-y-auto p-12 animate-fade-in custom-scrollbar">
               <div className="max-w-lg mx-auto w-full bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-4 mb-10">
-                  <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                    <Settings className="w-5 h-5 text-slate-900" />
+                <div className="flex items-center justify-between mb-10">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                      <Settings className="w-5 h-5 text-slate-900" />
+                    </div>
+                    <h3 className="text-2xl font-google font-bold italic">Global Settings</h3>
                   </div>
-                  <h3 className="text-2xl font-google font-bold italic">Global Settings</h3>
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('gh_token');
+                      localStorage.removeItem('groq_api_key');
+                      setGhToken('');
+                      setApiKey('');
+                      alert('Disconnected! All local credentials have been wiped. 🛡️');
+                    }}
+                    className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-100 transition-colors border border-rose-100"
+                  >
+                    Disconnect
+                  </button>
                 </div>
 
                 <div className="space-y-8">
